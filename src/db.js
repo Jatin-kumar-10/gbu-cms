@@ -4,13 +4,23 @@ const { Pool, types } = require('pg');
 // floats so the app can do normal arithmetic on quantities (OID 1700 = numeric).
 types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 
+// Hosted Postgres providers (Neon, Render, Railway, etc.) require TLS and
+// present a certificate not in Node's default trust store; a plain local
+// Postgres on 127.0.0.1/localhost doesn't need or support TLS at all.
+const host = process.env.DB_HOST || '127.0.0.1';
+const isLocal = host === '127.0.0.1' || host === 'localhost';
+const needsSsl = process.env.DB_SSL
+  ? process.env.DB_SSL === 'true'
+  : !isLocal;
+
 const pool = new Pool({
-  host: process.env.DB_HOST || '127.0.0.1',
+  host,
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'gbu_cms',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASS || '',
   max: 10,
+  ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
 /**

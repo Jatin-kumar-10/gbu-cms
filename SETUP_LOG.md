@@ -12,3 +12,8 @@
 - 2026-11-24 16:17 — .env updated (DB_PASS set)
 - 2026-11-24 16:17 — starting app with npm start
 - 2026-11-24 16:17 — server running on http://localhost:8000 (admin login: HTTP 200)
+- 2026-11-24 16:25 — git initialized, initial commit 97f55ee (.env excluded), pushed to origin/main (github.com/Jatin-kumar-10/gbu-cms)
+- 2026-11-24 16:31 — checking Neon deployment database (neondb) before schema load
+- 2026-11-24 16:31 — loading database\schema_postgres.sql into Neon (neondb)
+- 2026-11-24 16:31 — Neon schema loaded: 11 tables, 7 seed users
+- 2026-11-24 16:32 — committing and pushing to origin/main
