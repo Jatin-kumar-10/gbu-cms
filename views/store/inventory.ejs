@@ -1,0 +1,52 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div class="card p-3 mb-4">
+  <h6>Current Stock</h6>
+  <div id="stock">Loading…</div>
+</div>
+<div class="card p-3">
+  <h6>Material Requests</h6>
+  <select class="form-select form-select-sm w-auto mb-2" id="statusFilter">
+    <option value="Requested" selected>Pending (Requested)</option>
+    <option value="Issued">Issued</option>
+    <option value="Consumed">Consumed</option>
+    <option value="">All</option>
+  </select>
+  <div id="requests">Loading…</div>
+</div>
+<script>
+async function loadStock() {
+  const data = await Api.get('/api/inventory/items');
+  document.getElementById('stock').innerHTML = `<table class="table table-sm">
+    <thead><tr><th>Item</th><th>Unit</th><th>On Hand</th><th>Low Stock Threshold</th><th></th></tr></thead>
+    <tbody>${data.items.map(i => `<tr class="${i.low_stock == 1 ? 'table-warning' : ''}">
+      <td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.unit)}</td><td>${i.quantity_on_hand}</td><td>${i.low_stock_threshold}</td>
+      <td>${i.low_stock == 1 ? '<span class="badge text-bg-warning">Low Stock</span>' : ''}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+async function loadRequests() {
+  const status = document.getElementById('statusFilter').value;
+  const div = document.getElementById('requests');
+  const data = await Api.get('/api/inventory/requests' + (status ? '?status=' + status : ''));
+  if (!data.requests.length) { div.innerHTML = '<p class="text-muted small mb-0">No requests.</p>'; return; }
+  div.innerHTML = `<table class="table table-sm align-middle">
+    <thead><tr><th>Item</th><th>Work Order</th><th>Complaint</th><th>Qty Requested</th><th>Qty Issued</th><th>Status</th><th></th></tr></thead>
+    <tbody>${data.requests.map(r => `<tr>
+      <td>${escapeHtml(r.item_name)}</td><td>${escapeHtml(r.wo_code)}</td><td>${escapeHtml(r.complaint_code)}</td>
+      <td>${r.quantity_requested} ${escapeHtml(r.unit)}</td><td>${r.quantity_issued} ${escapeHtml(r.unit)}</td>
+      <td>${badge(r.status)}</td>
+      <td>${r.status === 'Requested' ? `<button class="btn btn-sm btn-success issueBtn" data-id="${r.id}" data-qty="${r.quantity_requested}">Issue</button>` : ''}</td>
+    </tr>`).join('')}</tbody></table>`;
+  document.querySelectorAll('.issueBtn').forEach(btn => btn.addEventListener('click', async () => {
+    const qty = prompt('Quantity to issue:', btn.dataset.qty);
+    if (!qty) return;
+    try {
+      await Api.post('/api/inventory/issue?id=' + btn.dataset.id, { quantity: parseFloat(qty) });
+      loadStock(); loadRequests();
+    } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+  }));
+}
+document.getElementById('statusFilter').addEventListener('change', loadRequests);
+loadStock(); loadRequests();
+</script>
+<%- include('../partials/footer') %>

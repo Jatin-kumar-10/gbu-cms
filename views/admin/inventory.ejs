@@ -1,0 +1,21 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div class="card p-3">
+  <h6>Current Stock</h6>
+  <div id="stock">Loading…</div>
+</div>
+<script>
+(async () => {
+  try {
+    const data = await Api.get('/api/inventory/items');
+    document.getElementById('stock').innerHTML = `<table class="table table-sm">
+      <thead><tr><th>Item</th><th>Unit</th><th>On Hand</th><th>Low Stock Threshold</th><th></th></tr></thead>
+      <tbody>${data.items.map(i => `<tr class="${i.low_stock == 1 ? 'table-warning' : ''}">
+        <td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.unit)}</td><td>${i.quantity_on_hand}</td><td>${i.low_stock_threshold}</td>
+        <td>${i.low_stock == 1 ? '<span class="badge text-bg-warning">Low Stock</span>' : ''}</td>
+      </tr>`).join('')}</tbody></table>
+      <p class="small text-muted">Material issuing is performed by the Store Officer role. This view is read-only for Admin.</p>`;
+  } catch (e) { showAlert(document.getElementById('stock'), e.message); }
+})();
+</script>
+<%- include('../partials/footer') %>

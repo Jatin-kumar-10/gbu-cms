@@ -1,0 +1,109 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div id="content">Loading…</div>
+<script>
+const woId = <%- JSON.stringify(id) %>;
+let items = [];
+
+async function load() {
+  const box = document.getElementById('content');
+  try {
+    const [data, itemData] = await Promise.all([
+      Api.get('/api/workorders/detail?id=' + woId),
+      Api.get('/api/lookups/inventory_items'),
+    ]);
+    const w = data.work_order;
+    items = itemData.items;
+
+    box.innerHTML = `
+      <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between">
+          <h5>${escapeHtml(w.wo_code)}</h5>
+          <div>${priorityBadge(w.priority)} ${badge(w.status)}</div>
+        </div>
+        <p class="mb-1"><strong>Complaint:</strong> ${escapeHtml(w.complaint_code)} — ${escapeHtml(w.category)}</p>
+        <p class="mb-1"><strong>Location:</strong> ${escapeHtml(w.building_name)} / ${escapeHtml(w.room_name)}</p>
+        <p class="mb-1"><strong>Description:</strong> ${escapeHtml(w.description)}</p>
+        ${w.inspection_note ? `<p class="small text-danger mb-0"><strong>Officer note:</strong> ${escapeHtml(w.inspection_note)}</p>` : ''}
+      </div>
+
+      ${w.status === 'Assigned' ? `<div class="card p-4 mb-3">
+        <h6>Start Work</h6>
+        <p class="small text-muted">Upload a before photo (optional but recommended) and start the job.</p>
+        <input type="file" class="form-control form-control-sm mb-2" id="beforePhoto" accept="image/*">
+        <button class="btn btn-primary btn-sm" id="startBtn">Start Work</button>
+      </div>` : ''}
+
+      ${w.status === 'Started' ? `<div class="card p-4 mb-3">
+        <button class="btn btn-primary btn-sm" id="progressBtn">Mark In Progress</button>
+      </div>` : ''}
+
+      ${['Started','InProgress'].includes(w.status) ? `<div class="card p-4 mb-3">
+        <h6>Request Material</h6>
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-5"><select class="form-select form-select-sm" id="itemSelect">${items.map(i => `<option value="${i.id}">${escapeHtml(i.name)} (${i.quantity_on_hand} ${escapeHtml(i.unit)} avail.)</option>`).join('')}</select></div>
+          <div class="col-md-3"><input type="number" min="0.01" step="0.01" class="form-control form-control-sm" id="reqQty" placeholder="Quantity"></div>
+          <div class="col-md-4"><button class="btn btn-outline-primary btn-sm" id="requestBtn">Request Material</button></div>
+        </div>
+
+        <h6>Complete Work</h6>
+        <p class="small text-muted">Upload an after photo and mark the work order complete.</p>
+        <input type="file" class="form-control form-control-sm mb-2" id="afterPhoto" accept="image/*">
+        <button class="btn btn-success btn-sm" id="completeBtn">Mark Complete</button>
+      </div>` : ''}
+
+      <div class="card p-4">
+        <h6>Material Usage</h6>
+        ${w.materials.length ? `<table class="table table-sm"><thead><tr><th>Item</th><th>Req.</th><th>Issued</th><th>Consumed</th><th>Status</th><th></th></tr></thead>
+          <tbody>${w.materials.map(m => `<tr>
+            <td>${escapeHtml(m.item_name)}</td><td>${m.quantity_requested} ${escapeHtml(m.unit)}</td>
+            <td>${m.quantity_issued} ${escapeHtml(m.unit)}</td><td>${m.quantity_consumed} ${escapeHtml(m.unit)}</td>
+            <td>${badge(m.status)}</td>
+            <td>${m.status === 'Issued' ? `<button class="btn btn-sm btn-outline-success consumeBtn" data-id="${m.id}" data-max="${m.quantity_issued}">Record Consumption</button>` : ''}</td>
+          </tr>`).join('')}</tbody></table>`
+        : '<p class="text-muted small mb-0">No material requested yet.</p>'}
+      </div>
+    `;
+
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn) startBtn.onclick = async () => {
+      const fd = new FormData();
+      const f = document.getElementById('beforePhoto').files[0];
+      if (f) fd.append('before_photo', f);
+      try { await Api.postForm('/api/workorders/start?id=' + woId, fd); load(); }
+      catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    };
+    const progressBtn = document.getElementById('progressBtn');
+    if (progressBtn) progressBtn.onclick = async () => {
+      try { await Api.post('/api/workorders/progress?id=' + woId); load(); }
+      catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    };
+    const requestBtn = document.getElementById('requestBtn');
+    if (requestBtn) requestBtn.onclick = async () => {
+      const qty = parseFloat(document.getElementById('reqQty').value);
+      if (!qty || qty <= 0) { showAlert(document.getElementById('alertBox'), 'Enter a valid quantity.'); return; }
+      try {
+        await Api.post('/api/inventory/request', { work_order_id: woId, item_id: document.getElementById('itemSelect').value, quantity: qty });
+        load();
+      } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    };
+    const completeBtn = document.getElementById('completeBtn');
+    if (completeBtn) completeBtn.onclick = async () => {
+      const fd = new FormData();
+      const f = document.getElementById('afterPhoto').files[0];
+      if (f) fd.append('after_photo', f);
+      try { await Api.postForm('/api/workorders/complete?id=' + woId, fd); load(); }
+      catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    };
+    document.querySelectorAll('.consumeBtn').forEach(btn => btn.addEventListener('click', async () => {
+      const max = btn.dataset.max;
+      const qty = prompt(`Quantity actually consumed (issued: ${max}):`, max);
+      if (!qty) return;
+      try { await Api.post('/api/inventory/consume?id=' + btn.dataset.id, { quantity: parseFloat(qty) }); load(); }
+      catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    }));
+  } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+}
+load();
+</script>
+<%- include('../partials/footer') %>

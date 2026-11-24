@@ -1,0 +1,89 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div id="content">Loading…</div>
+<script>
+const complaintId = <%- JSON.stringify(id) %>;
+
+function workOrderHtml(wo) {
+  return `<div class="border rounded p-2 mb-2">
+    <div><strong>${escapeHtml(wo.wo_code)}</strong> ${badge(wo.status)}</div>
+    <div class="small text-muted">Technician: ${escapeHtml(wo.technician_name || '—')} · Created: ${fmtDate(wo.created_at)}</div>
+    ${wo.before_photo_path ? `<a href="/${wo.before_photo_path}" target="_blank" class="small">Before photo</a>` : ''}
+    ${wo.after_photo_path ? ` · <a href="/${wo.after_photo_path}" target="_blank" class="small">After photo</a>` : ''}
+    ${wo.inspection_note ? `<div class="small mt-1"><strong>Inspection note:</strong> ${escapeHtml(wo.inspection_note)}</div>` : ''}
+  </div>`;
+}
+
+async function load() {
+  const box = document.getElementById('content');
+  try {
+    const data = await Api.get('/api/complaints/detail?id=' + complaintId);
+    const c = data.complaint;
+    const canReopen = c.status === 'Closed';
+    const canFeedback = c.status === 'Closed' && c.feedback.length === 0;
+
+    box.innerHTML = `
+      <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5>${escapeHtml(c.complaint_code)}</h5>
+          <div>${priorityBadge(c.priority)} ${badge(c.status)}</div>
+        </div>
+        <p class="mb-1"><strong>Location:</strong> ${escapeHtml(c.building_name)} / ${escapeHtml(c.room_name)}</p>
+        <p class="mb-1"><strong>Department:</strong> ${escapeHtml(c.department_name)} &nbsp; <strong>Category:</strong> ${escapeHtml(c.category)}</p>
+        <p class="mb-1"><strong>Description:</strong> ${escapeHtml(c.description)}</p>
+        ${c.photo_path ? `<p><a href="/${c.photo_path}" target="_blank">View attached photo</a></p>` : ''}
+        <p class="text-muted small mb-0">Raised: ${fmtDate(c.created_at)} · SLA target: ${c.sla_target_hours}h ${c.invalid_reason ? '· Invalid reason: ' + escapeHtml(c.invalid_reason) : ''}</p>
+      </div>
+
+      <div class="card p-4 mb-3">
+        <h6>Work Orders</h6>
+        ${c.work_orders.length ? c.work_orders.map(workOrderHtml).join('') : '<p class="text-muted small">No work order yet — awaiting verification/assignment.</p>'}
+      </div>
+
+      ${canReopen ? `<div class="card p-4 mb-3">
+        <h6>Not actually resolved?</h6>
+        <p class="small text-muted">You can reopen within 7 days of closure.</p>
+        <button class="btn btn-outline-danger btn-sm" id="reopenBtn">Reopen Complaint</button>
+      </div>` : ''}
+
+      ${canFeedback ? `<div class="card p-4 mb-3">
+        <h6>Share Feedback</h6>
+        <form id="fbForm">
+          <div class="mb-2">
+            <label class="form-label small">Rating</label>
+            <select class="form-select form-select-sm w-auto d-inline-block" id="fbRating">
+              <option value="5">5 - Excellent</option><option value="4">4 - Good</option>
+              <option value="3">3 - Average</option><option value="2">2 - Poor</option><option value="1">1 - Very poor</option>
+            </select>
+          </div>
+          <div class="mb-2"><textarea class="form-control form-control-sm" id="fbComment" placeholder="Optional comment"></textarea></div>
+          <button class="btn btn-primary btn-sm" type="submit">Submit Feedback</button>
+        </form>
+      </div>` : ''}
+
+      ${c.feedback.length ? `<div class="card p-4"><h6>Your Feedback</h6>${c.feedback.map(f => `<p class="small mb-0">Rating: ${f.rating}/5 — ${escapeHtml(f.comment || '')}</p>`).join('')}</div>` : ''}
+    `;
+
+    const reopenBtn = document.getElementById('reopenBtn');
+    if (reopenBtn) reopenBtn.addEventListener('click', async () => {
+      try { await Api.post('/api/complaints/reopen?id=' + complaintId); load(); }
+      catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+    });
+
+    const fbForm = document.getElementById('fbForm');
+    if (fbForm) fbForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await Api.post('/api/feedback/submit', {
+          complaint_id: complaintId,
+          rating: document.getElementById('fbRating').value,
+          comment: document.getElementById('fbComment').value,
+        });
+        load();
+      } catch (err) { showAlert(document.getElementById('alertBox'), err.message); }
+    });
+  } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+}
+load();
+</script>
+<%- include('../partials/footer') %>

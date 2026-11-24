@@ -1,0 +1,44 @@
+<%- include('../partials/header') %>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Reports &amp; Analytics</h5>
+  <a href="/api/reports/export_csv" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download"></i> Export Complaints CSV</a>
+</div>
+<div class="row g-3 mb-4" id="kpis"></div>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h6>Complaints by Status</h6>
+      <table class="table table-sm" id="byStatus"><tbody></tbody></table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h6>Complaints by Department</h6>
+      <table class="table table-sm" id="byDept"><tbody></tbody></table>
+    </div>
+  </div>
+  <div class="col-md-12">
+    <div class="card p-3">
+      <h6>Low Stock Items</h6>
+      <table class="table table-sm" id="lowStock"><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+<script>
+(async () => {
+  try {
+    const s = await Api.get('/api/reports/summary');
+    document.getElementById('kpis').innerHTML = [
+      ['SLA Breaches (open)', s.sla_breaches], ['Open Tracked', s.open_tracked],
+      ['Avg Resolution (h)', s.avg_resolution_hours ?? '—'], ['Low Stock Items', s.low_stock_items.length],
+    ].map(([l,v]) => `<div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="kpi-value">${v}</div><div class="kpi-label">${l}</div></div></div>`).join('');
+
+    document.querySelector('#byStatus tbody').innerHTML = s.by_status.map(r => `<tr><td>${badge(r.status)}</td><td class="text-end">${r.total}</td></tr>`).join('');
+    document.querySelector('#byDept tbody').innerHTML = s.by_department.map(r => `<tr><td>${escapeHtml(r.department)}</td><td class="text-end">${r.total}</td></tr>`).join('');
+    document.querySelector('#lowStock tbody').innerHTML = s.low_stock_items.length
+      ? s.low_stock_items.map(r => `<tr><td>${escapeHtml(r.name)}</td><td>${r.quantity_on_hand} ${escapeHtml(r.unit)}</td><td class="text-muted">threshold ${r.low_stock_threshold}</td></tr>`).join('')
+      : '<tr><td class="text-muted">None — all stock above threshold.</td></tr>';
+  } catch (e) { showAlert(document.getElementById('kpis'), e.message); }
+})();
+</script>
+<%- include('../partials/footer') %>

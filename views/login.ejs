@@ -1,0 +1,38 @@
+<%- include('partials/header') %>
+<div class="row justify-content-center mt-5">
+  <div class="col-md-5 col-lg-4">
+    <div class="card p-4">
+      <h4 class="mb-1">GBU-CMS</h4>
+      <p class="text-muted small mb-3">Gautam Buddha University — Campus Maintenance Management System</p>
+      <div id="alertBox"></div>
+      <form id="loginForm">
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" id="email" required autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-control" id="password" required>
+        </div>
+        <button class="btn btn-primary w-100" type="submit">Login</button>
+      </form>
+      <p class="text-center mt-3 small mb-0">No account? <a href="/register">Register as Student/Faculty/Staff</a></p>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const box = document.getElementById('alertBox');
+  try {
+    const data = await Api.post('/api/auth/login', {
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value,
+    });
+    window.location.href = data.redirect;
+  } catch (err) {
+    showAlert(box, err.message);
+  }
+});
+</script>
+<%- include('partials/footer') %>

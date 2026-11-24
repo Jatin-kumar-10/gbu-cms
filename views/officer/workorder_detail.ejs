@@ -1,0 +1,61 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div id="content">Loading…</div>
+<script>
+const woId = <%- JSON.stringify(id) %>;
+
+async function load() {
+  const box = document.getElementById('content');
+  try {
+    const data = await Api.get('/api/workorders/detail?id=' + woId);
+    const w = data.work_order;
+    const canInspect = w.status === 'Completed';
+
+    box.innerHTML = `
+      <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between">
+          <h5>${escapeHtml(w.wo_code)}</h5>
+          <div>${priorityBadge(w.priority)} ${badge(w.status)}</div>
+        </div>
+        <p class="mb-1"><strong>Complaint:</strong> ${escapeHtml(w.complaint_code)} — ${escapeHtml(w.category)}</p>
+        <p class="mb-1"><strong>Location:</strong> ${escapeHtml(w.building_name)} / ${escapeHtml(w.room_name)}</p>
+        <p class="mb-1"><strong>Description:</strong> ${escapeHtml(w.description)}</p>
+        <p class="mb-1"><strong>Technician:</strong> ${escapeHtml(w.technician_name || '—')}</p>
+        <p class="mb-0">
+          ${w.before_photo_path ? `<a href="/${w.before_photo_path}" target="_blank">Before photo</a>` : 'No before photo'}
+          &nbsp;·&nbsp;
+          ${w.after_photo_path ? `<a href="/${w.after_photo_path}" target="_blank">After photo</a>` : 'No after photo'}
+        </p>
+        ${w.inspection_note ? `<p class="small mt-2"><strong>Last inspection note:</strong> ${escapeHtml(w.inspection_note)}</p>` : ''}
+      </div>
+
+      <div class="card p-4 mb-3">
+        <h6>Material Usage</h6>
+        ${w.materials.length ? `<table class="table table-sm"><thead><tr><th>Item</th><th>Requested</th><th>Issued</th><th>Consumed</th><th>Status</th></tr></thead>
+          <tbody>${w.materials.map(m => `<tr><td>${escapeHtml(m.item_name)}</td><td>${m.quantity_requested} ${escapeHtml(m.unit)}</td><td>${m.quantity_issued} ${escapeHtml(m.unit)}</td><td>${m.quantity_consumed} ${escapeHtml(m.unit)}</td><td>${badge(m.status)}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="text-muted small mb-0">No material requested for this work order.</p>'}
+      </div>
+
+      ${canInspect ? `<div class="card p-4">
+        <h6>Inspection</h6>
+        <textarea class="form-control form-control-sm mb-2" id="note" placeholder="Inspection note (required for rejection)"></textarea>
+        <button class="btn btn-success btn-sm" id="closeBtn">Accept &amp; Close</button>
+        <button class="btn btn-outline-danger btn-sm" id="rejectBtn">Reject (Send for Rework)</button>
+      </div>` : ''}
+    `;
+
+    if (canInspect) {
+      document.getElementById('closeBtn').onclick = async () => {
+        try { await Api.post('/api/workorders/inspect?id=' + woId, { decision: 'close', note: document.getElementById('note').value }); load(); }
+        catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+      };
+      document.getElementById('rejectBtn').onclick = async () => {
+        try { await Api.post('/api/workorders/inspect?id=' + woId, { decision: 'reject', note: document.getElementById('note').value }); load(); }
+        catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+      };
+    }
+  } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+}
+load();
+</script>
+<%- include('../partials/footer') %>

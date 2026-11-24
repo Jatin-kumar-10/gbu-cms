@@ -1,0 +1,45 @@
+<%- include('../partials/header') %>
+<h4 class="mb-3">Department Dashboard</h4>
+<div class="row g-3 mb-4" id="kpis"></div>
+<div class="card p-3 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0">Complaints Awaiting Verification</h6>
+    <a href="/officer/complaints?status=Submitted" class="btn btn-sm btn-outline-primary">View all</a>
+  </div>
+  <div id="pending">Loading…</div>
+</div>
+<script>
+(async () => {
+  try {
+    const summary = await Api.get('/api/reports/summary');
+    const kpis = document.getElementById('kpis');
+    const statusMap = {};
+    summary.by_status.forEach(s => statusMap[s.status] = s.total);
+    const cards = [
+      ['Submitted', statusMap['Submitted'] || 0],
+      ['In Progress', statusMap['InProgress'] || 0],
+      ['Completed (Insp. pending)', statusMap['CompletedByTechnician'] || 0],
+      ['Closed', statusMap['Closed'] || 0],
+      ['SLA Breaches', summary.sla_breaches],
+      ['Avg Resolution (h)', summary.avg_resolution_hours ?? '—'],
+    ];
+    kpis.innerHTML = cards.map(([label, val]) => `
+      <div class="col-6 col-md-2"><div class="card p-3 text-center">
+        <div class="kpi-value">${val}</div><div class="kpi-label">${label}</div>
+      </div></div>`).join('');
+  } catch (e) { showAlert(document.getElementById('kpis'), e.message); }
+
+  try {
+    const data = await Api.get('/api/complaints/list?status=Submitted');
+    const div = document.getElementById('pending');
+    if (!data.complaints.length) { div.innerHTML = '<p class="text-muted small mb-0">Nothing pending verification.</p>'; return; }
+    div.innerHTML = `<table class="table table-sm"><thead><tr><th>Code</th><th>Category</th><th>Priority</th><th>Raised</th><th></th></tr></thead>
+      <tbody>${data.complaints.slice(0,8).map(c => `<tr>
+        <td>${escapeHtml(c.complaint_code)}</td><td>${escapeHtml(c.category)}</td><td>${priorityBadge(c.priority)}</td>
+        <td>${fmtDate(c.created_at)}</td>
+        <td><a href="/officer/complaint_detail?id=${c.id}" class="btn btn-sm btn-primary">Review</a></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { showAlert(document.getElementById('pending'), e.message); }
+})();
+</script>
+<%- include('../partials/footer') %>

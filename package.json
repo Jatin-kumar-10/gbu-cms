@@ -1,0 +1,21 @@
+{
+  "name": "gbu-cms-node",
+  "version": "1.0.0",
+  "description": "GBU-CMS — Campus Maintenance Management System (Node.js/Express port)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.10",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.5.0",
+    "pg": "^8.23.1"
+  }
+}

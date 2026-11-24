@@ -1,0 +1,18 @@
+<%- include('../partials/header') %>
+<h5 class="mb-3">Store Dashboard</h5>
+<div class="row g-3 mb-4">
+  <div class="col-md-4"><div class="card p-3 text-center"><div class="kpi-value" id="pendingCount">—</div><div class="kpi-label">Pending Requests</div></div></div>
+  <div class="col-md-4"><div class="card p-3 text-center"><div class="kpi-value" id="lowStockCount">—</div><div class="kpi-label">Low Stock Items</div></div></div>
+  <div class="col-md-4"><a href="/store/inventory" class="btn btn-primary w-100 h-100 d-flex align-items-center justify-content-center">Go to Inventory &amp; Requests</a></div>
+</div>
+<script>
+(async () => {
+  try {
+    const reqs = await Api.get('/api/inventory/requests?status=Requested');
+    document.getElementById('pendingCount').textContent = reqs.requests.length;
+    const items = await Api.get('/api/inventory/items');
+    document.getElementById('lowStockCount').textContent = items.items.filter(i => i.low_stock == 1).length;
+  } catch (e) { /* ignore */ }
+})();
+</script>
+<%- include('../partials/footer') %>

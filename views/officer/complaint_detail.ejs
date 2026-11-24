@@ -1,0 +1,124 @@
+<%- include('../partials/header') %>
+<div id="alertBox"></div>
+<div id="content">Loading…</div>
+<script>
+const complaintId = <%- JSON.stringify(id) %>;
+let departments = [];
+
+function workOrderHtml(wo) {
+  return `<div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center">
+    <div>
+      <strong>${escapeHtml(wo.wo_code)}</strong> ${badge(wo.status)}
+      <div class="small text-muted">Technician: ${escapeHtml(wo.technician_name || '—')}</div>
+    </div>
+    <a href="/officer/workorder_detail?id=${wo.id}" class="btn btn-sm btn-outline-primary">Open</a>
+  </div>`;
+}
+
+async function load() {
+  const box = document.getElementById('content');
+  try {
+    const [cdata, ddata] = await Promise.all([
+      Api.get('/api/complaints/detail?id=' + complaintId),
+      Api.get('/api/lookups/departments'),
+    ]);
+    const c = cdata.complaint;
+    departments = ddata.departments;
+    const latestWo = c.work_orders[0];
+    const canCreateWo = ['Verified', 'Reopened'].includes(c.status) && (!latestWo || ['Closed'].includes(latestWo.status));
+    const canVerify = c.status === 'Submitted';
+
+    box.innerHTML = `
+      <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5>${escapeHtml(c.complaint_code)}</h5>
+          <div>${priorityBadge(c.priority)} ${badge(c.status)}</div>
+        </div>
+        <p class="mb-1"><strong>Raised by:</strong> ${escapeHtml(c.user_name)} (${escapeHtml(c.user_email)})</p>
+        <p class="mb-1"><strong>Location:</strong> ${escapeHtml(c.building_name)} / ${escapeHtml(c.room_name)}</p>
+        <p class="mb-1"><strong>Category:</strong> ${escapeHtml(c.category)} &nbsp; <strong>Department:</strong> ${escapeHtml(c.department_name)}</p>
+        <p class="mb-1"><strong>Description:</strong> ${escapeHtml(c.description)}</p>
+        ${c.photo_path ? `<p><a href="/${c.photo_path}" target="_blank">View attached photo</a></p>` : ''}
+        <p class="text-muted small mb-0">Raised: ${fmtDate(c.created_at)} · SLA target: ${c.sla_target_hours}h · Reopened ${c.reopen_count}x</p>
+      </div>
+
+      ${canVerify ? `<div class="card p-4 mb-3">
+        <h6>Verify &amp; Classify</h6>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small">Department</label>
+            <select class="form-select form-select-sm" id="vDept">${departments.map(d => `<option value="${d.id}" ${d.id==c.department_id?'selected':''}>${escapeHtml(d.name)}</option>`).join('')}</select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Category</label>
+            <input class="form-control form-control-sm" id="vCategory" value="${escapeHtml(c.category)}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Priority</label>
+            <select class="form-select form-select-sm" id="vPriority">
+              ${['Low','Medium','High'].map(p => `<option ${p===c.priority?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-success btn-sm" id="verifyBtn">Verify Complaint</button>
+          <button class="btn btn-outline-danger btn-sm" id="invalidBtn">Mark Invalid / Duplicate</button>
+        </div>
+      </div>` : ''}
+
+      ${canCreateWo ? `<div class="card p-4 mb-3" id="woCard">
+        <h6>Create Work Order</h6>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label small">Assign Technician</label>
+            <select class="form-select form-select-sm" id="techSelect"><option>Loading…</option></select>
+          </div>
+          <div class="col-md-3"><button class="btn btn-primary btn-sm" id="createWoBtn">Create &amp; Assign</button></div>
+        </div>
+      </div>` : ''}
+
+      <div class="card p-4">
+        <h6>Work Order History</h6>
+        ${c.work_orders.length ? c.work_orders.map(workOrderHtml).join('') : '<p class="text-muted small mb-0">None yet.</p>'}
+      </div>
+    `;
+
+    if (canVerify) {
+      document.getElementById('verifyBtn').onclick = async () => {
+        try {
+          await Api.post('/api/complaints/verify?id=' + complaintId, {
+            department_id: document.getElementById('vDept').value,
+            category: document.getElementById('vCategory').value,
+            priority: document.getElementById('vPriority').value,
+          });
+          load();
+        } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+      };
+      document.getElementById('invalidBtn').onclick = async () => {
+        const reason = prompt('Reason for marking invalid/duplicate:');
+        if (!reason) return;
+        try { await Api.post('/api/complaints/invalid?id=' + complaintId, { reason }); load(); }
+        catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+      };
+    }
+
+    if (canCreateWo) {
+      const techData = await Api.get('/api/lookups/technicians?department_id=' + c.department_id);
+      const sel = document.getElementById('techSelect');
+      sel.innerHTML = techData.technicians.length
+        ? techData.technicians.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')
+        : '<option value="">No technicians in this department</option>';
+      document.getElementById('createWoBtn').onclick = async () => {
+        const techId = sel.value;
+        if (!techId) { showAlert(document.getElementById('alertBox'), 'No technician available to assign.'); return; }
+        try {
+          await Api.post('/api/workorders/create', { complaint_id: complaintId, technician_id: techId });
+          load();
+        } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+      };
+    }
+  } catch (e) { showAlert(document.getElementById('alertBox'), e.message); }
+}
+load();
+</script>
+<%- include('../partials/footer') %>

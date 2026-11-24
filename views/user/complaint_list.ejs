@@ -1,0 +1,26 @@
+<%- include('../partials/header') %>
+<h5 class="mb-3">My Complaints</h5>
+<div class="card p-3">
+  <div id="list">Loading…</div>
+</div>
+<script>
+(async () => {
+  const list = document.getElementById('list');
+  try {
+    const data = await Api.get('/api/complaints/list');
+    if (!data.complaints.length) { list.innerHTML = '<p class="text-muted">No complaints yet. <a href="/user/complaint_new">Register one</a>.</p>'; return; }
+    list.innerHTML = `<table class="table align-middle">
+      <thead><tr><th>Code</th><th>Location</th><th>Category</th><th>Priority</th><th>Status</th><th>Raised</th><th></th></tr></thead>
+      <tbody>${data.complaints.map(c => `<tr>
+        <td>${escapeHtml(c.complaint_code)}</td>
+        <td>${escapeHtml(c.building_name)} / ${escapeHtml(c.room_name)}</td>
+        <td>${escapeHtml(c.category)}</td>
+        <td>${priorityBadge(c.priority)}</td>
+        <td>${badge(c.status)}</td>
+        <td>${fmtDate(c.created_at)}</td>
+        <td><a href="/user/complaint_detail?id=${c.id}" class="btn btn-sm btn-outline-primary">View</a></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { showAlert(list, e.message); }
+})();
+</script>
+<%- include('../partials/footer') %>

@@ -1,0 +1,91 @@
+<%- include('../partials/header') %>
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <h5 class="mb-3">Register a Maintenance Complaint</h5>
+      <div id="alertBox"></div>
+      <form id="form">
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Building</label>
+            <select class="form-select" id="building" required></select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Room / Facility</label>
+            <select class="form-select" id="room" required></select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="category" required>
+            <optgroup label="Civil">
+              <option>Plumbing</option><option>Carpentry</option><option>Masonry</option>
+              <option>Painting</option><option>Flooring</option><option>Furniture repair</option>
+              <option>Sanitary work</option><option value="General civil maintenance">General civil</option>
+            </optgroup>
+            <optgroup label="Electrical">
+              <option>Fans</option><option>Lights</option><option value="Switches/sockets">Switches/sockets</option>
+              <option>Wiring</option><option value="Power supply">Power supply</option>
+            </optgroup>
+            <optgroup label="Horticulture">
+              <option value="Tree maintenance">Tree maintenance</option><option>Plantation</option>
+              <option value="Grass cutting">Grass/lawn cutting</option><option value="Garden maintenance">Garden maintenance</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" id="description" rows="4" required placeholder="Describe the issue in detail"></textarea>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Priority (your suggestion — officer may adjust)</label>
+            <select class="form-select" id="priority">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Photo (optional, JPG/PNG/WEBP, max 2MB)</label>
+            <input type="file" class="form-control" id="photo" accept="image/*">
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">Submit Complaint</button>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+async function loadBuildings() {
+  const data = await Api.get('/api/admin_locations/buildings');
+  const sel = document.getElementById('building');
+  sel.innerHTML = data.buildings.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  loadRooms(sel.value);
+}
+async function loadRooms(buildingId) {
+  const data = await Api.get('/api/admin_locations/rooms?building_id=' + buildingId);
+  document.getElementById('room').innerHTML = data.rooms.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+}
+document.getElementById('building').addEventListener('change', (e) => loadRooms(e.target.value));
+loadBuildings();
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const box = document.getElementById('alertBox');
+  const fd = new FormData();
+  fd.append('room_id', document.getElementById('room').value);
+  fd.append('category', document.getElementById('category').value);
+  fd.append('description', document.getElementById('description').value);
+  fd.append('priority', document.getElementById('priority').value);
+  const photo = document.getElementById('photo').files[0];
+  if (photo) fd.append('photo', photo);
+  try {
+    const data = await Api.postForm('/api/complaints/create', fd);
+    window.location.href = '/user/complaint_detail?id=' + data.id;
+  } catch (err) {
+    showAlert(box, err.message);
+  }
+});
+</script>
+<%- include('../partials/footer') %>

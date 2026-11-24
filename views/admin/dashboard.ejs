@@ -1,0 +1,36 @@
+<%- include('../partials/header') %>
+<h4 class="mb-3">University-wide Overview</h4>
+<div class="row g-3 mb-4" id="kpis"></div>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h6>Complaints by Status</h6>
+      <table class="table table-sm"><tbody id="byStatus"></tbody></table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h6>Complaints by Department</h6>
+      <table class="table table-sm"><tbody id="byDept"></tbody></table>
+    </div>
+  </div>
+</div>
+<div class="row mt-2 g-3">
+  <div class="col-md-4"><a href="/admin/users" class="btn btn-outline-primary w-100 py-3">Manage Users</a></div>
+  <div class="col-md-4"><a href="/admin/locations" class="btn btn-outline-primary w-100 py-3">Manage Locations</a></div>
+  <div class="col-md-4"><a href="/officer/reports" class="btn btn-outline-primary w-100 py-3">Full Reports &amp; Export</a></div>
+</div>
+<script>
+(async () => {
+  try {
+    const s = await Api.get('/api/reports/summary');
+    document.getElementById('kpis').innerHTML = [
+      ['SLA Breaches (open)', s.sla_breaches], ['Open Tracked', s.open_tracked],
+      ['Avg Resolution (h)', s.avg_resolution_hours ?? '—'], ['Low Stock Items', s.low_stock_items.length],
+    ].map(([l,v]) => `<div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="kpi-value">${v}</div><div class="kpi-label">${l}</div></div></div>`).join('');
+    document.getElementById('byStatus').innerHTML = s.by_status.map(r => `<tr><td>${badge(r.status)}</td><td class="text-end">${r.total}</td></tr>`).join('');
+    document.getElementById('byDept').innerHTML = s.by_department.map(r => `<tr><td>${escapeHtml(r.department)}</td><td class="text-end">${r.total}</td></tr>`).join('');
+  } catch (e) { showAlert(document.getElementById('kpis'), e.message); }
+})();
+</script>
+<%- include('../partials/footer') %>

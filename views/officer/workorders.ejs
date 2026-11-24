@@ -1,0 +1,35 @@
+<%- include('../partials/header') %>
+<h5 class="mb-3">Work Orders</h5>
+<div class="mb-3">
+  <select class="form-select form-select-sm w-auto d-inline-block" id="statusFilter">
+    <option value="">All statuses</option>
+    <% ['Assigned','Started','InProgress','Completed','Closed'].forEach(function(s) { %>
+      <option value="<%= s %>"><%= s %></option>
+    <% }); %>
+  </select>
+</div>
+<div class="card p-3"><div id="list">Loading…</div></div>
+<script>
+async function render() {
+  const status = document.getElementById('statusFilter').value;
+  const list = document.getElementById('list');
+  try {
+    const data = await Api.get('/api/workorders/list' + (status ? '?status=' + status : ''));
+    if (!data.work_orders.length) { list.innerHTML = '<p class="text-muted">No work orders found.</p>'; return; }
+    list.innerHTML = `<table class="table table-sm align-middle">
+      <thead><tr><th>WO Code</th><th>Complaint</th><th>Technician</th><th>Priority</th><th>Status</th><th>Created</th><th></th></tr></thead>
+      <tbody>${data.work_orders.map(w => `<tr>
+        <td>${escapeHtml(w.wo_code)}</td>
+        <td>${escapeHtml(w.complaint_code)} <span class="text-muted small">(${escapeHtml(w.category)})</span></td>
+        <td>${escapeHtml(w.technician_name || '—')}</td>
+        <td>${priorityBadge(w.priority)}</td>
+        <td>${badge(w.status)}</td>
+        <td>${fmtDate(w.created_at)}</td>
+        <td><a href="/officer/workorder_detail?id=${w.id}" class="btn btn-sm btn-outline-primary">Open</a></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { showAlert(list, e.message); }
+}
+document.getElementById('statusFilter').addEventListener('change', render);
+render();
+</script>
+<%- include('../partials/footer') %>
